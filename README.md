@@ -15,47 +15,70 @@ This project reconstructs a jumbled video back into its correct chronological or
  ## Problem Statement
 We are provided with a 5-second, 1080p, 60 FPS video whose frames have been randomly jumbled.The goal is to reconstruct the original video by restoring the correct frame order asaccurately and efficiently as possible.
 
-##  Overview
-Let's first see what are the different ways this task could be done
-### Pixel Difference (Fastest, Simple) :
-The main idea of pixel difference is that instead of storing every full frame,you store only how each frame differs from the previous one ( pixel-wise changes).Then, reconstruction simply means adding those differences back over time to rebuild the original frames.
-### Feature Matching (Classic CV):
-While pixel difference compares raw intensity values between consecutive frames, feature matching compares key points or distinctive features (like edges, corners, textures) that represent objects or structures in the scene.
-### Deep Embeddings (Modern & Accurate):
-Instead of comparing frame by frame we embed these frames via pretrained CNN (ResNet, CLIP, ViT) then sort frames using cosine similarity.
-### Optical Flow or motion estimation
-Estimate direction of motion between frames (how objects move). Then reorder based on forward flow continuity.
+## Overview
+This project automatically reconstructs a jumbled video by sorting its shuffled frames into their correct order using pairwise pixel similarity.
+It includes:
 
-## Why SSIM?
-
-The SSIM (Structural Similarity Index Metric) is a perceptual metric that measures image quality degradation based on structural information, luminance, and contrast.  
-In this project, SSIM is applied to each corresponding frame pair from two videos to determine how visually similar they are.
-
-Unlike simple pixel-wise metrics such as MSE or PSNR, SSIM correlates better with human visual perception.It compares images based on structure, brightness and contrast resulting in more meaningful quality assessment.In this project SSIM based approach proved to be more accruate because:
-- Video has little Camera Change
-- Feature Detectors (ORB, SIFT, etc.) don’t Work Well on Smooth or Repetitive Scenes and in the video given here, there are almost similar background and very few unstable keypoints.
-- Deep networks like ResNet or CLIP focus on semantic meaning what’s in the image, not how slightly it changed.Two consecutive frames of a person waving look identical to a CNN, because both contain “a person.”
-- Optical Flow May Fail if Motion Is Minimal
-
-
-##  Algorithm Explanation
-
-### **Techniques Used**
-- Structural Similarity Index (SSIM) from `skimage.metrics`
-- Frame-by-frame comparison using OpenCV
-- Average SSIM score computed across all frames
-
-### **Working Steps**
-1. Read both reference and test videos using OpenCV.  
-2. Ensure both videos have the same frame size and number of frames.  
-3. Convert each frame to grayscale.  
-4. Compute SSIM between corresponding frames.  
-5. Store per-frame SSIM and calculate the overall average.
-
-
+A Python script (main.py) for frame sorting
+A Bash automation script (script.sh) to handle extraction, sorting and re-encoding end-to-end
 
 ## Installation
 
+### **Requirements**
+Bash Shell
+Python 3.12 or later
+ffmpeg installed and in PATH
+pip package manager
+
+### **Install Dependencies**
+Install dependencies via the follwing command:-
+pip install numpy pillow scipy
+
+### **How to Run**
+
+You can either run manually (Python-only) or automatically using the Bash script.
+
+## Algorithm and thought process
+
+The algorithm relies on a pixel-based similarity metric to reorder frames:
+
+**Frame Preprocessing** :Each frame is converted to grayscale (reducing color noise).Resized so that the longest side = max_side (default 192 px) to speed up computation.Flattened into a 1D NumPy array of pixel intensities.
+
+**Pairwise Distance Matrix** : A full N×N distance matrix is computed using Manhattan Distance (Sum of Absolute Differences) via scipy.spatial.distance.cdist. This measures how visually different each frame is from every other.
+
+**Starting Frame Selection** :The algorithm locates the two frames that are most different (maximum distance).One of them becomes the starting point, since it’s likely at an “edge” of the sequence.
+
+**Greedy Frame Linking** :Starting from the initial frame, the algorithm repeatedly finds the closest unused frame (lowest distance) to form a continuous “chain.”This heuristic works because consecutive frames in a real video are visually similar.
+
+**Output**: The frames are reordered according to this chain and saved sequentially.
+
+## Design Considerations
+Aspect	Design Choice	Rationale
+Similarity Metric	Manhattan Distance (Sum of Absolute Differences)	Efficient and robust for grayscale images
+Approach	Greedy nearest-neighbor chaining	Simple, deterministic, no ML training required
+Time Complexity	O(N²)	Due to full pairwise distance computation
+Optimization	Frame resizing via --max-side	Balances accuracy and speed
+Robustness	Works well for visually coherent frames (low motion noise)	May need feature-based matching for heavy motion
+
+## Testing and Evaluation
+
+You can test on any short video clip:
+ 
+./run_sorting.sh -i sample_jumbled.mp4
+
+Verify results by comparing:
+Original video vs. output.mp4
+Visual smoothness and logical motion continuity
+
+**Optional metrics:**
+SSIM (Structural Similarity Index) between consecutive frames
+Average frame distance reduction after sorting
+
+
+
+
+
+  
 
 
 
