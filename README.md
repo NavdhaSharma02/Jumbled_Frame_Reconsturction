@@ -18,7 +18,6 @@ We are provided with a 5-second, 1080p, 60 FPS video whose frames have been rand
 ## Overview
 This project automatically reconstructs a jumbled video by sorting its shuffled frames into their correct order using pairwise pixel similarity.
 It includes:
-
 A Python script (main.py) for frame sorting
 A Bash automation script (script.sh) to handle extraction, sorting and re-encoding end-to-end
 
@@ -36,9 +35,12 @@ pip install numpy pillow scipy
 
 ### **How to Run**
 
-You can either run manually (Python-only) or automatically using the Bash script.
+You can run it using the bash script by opening git bash or the vscode and using the following commands for:
 
-## Algorithm and thought process
+- Making it executable: chmod +x run_sorting.sh
+- Runnning it: ./run_sorting.sh -i input_video.mp4
+
+## Algorithm 
 
 The algorithm relies on a pixel-based similarity metric to reorder frames:
 
@@ -53,12 +55,15 @@ The algorithm relies on a pixel-based similarity metric to reorder frames:
 **Output**: The frames are reordered according to this chain and saved sequentially.
 
 ## Design Considerations
-Aspect	Design Choice	Rationale
-Similarity Metric	Manhattan Distance (Sum of Absolute Differences)	Efficient and robust for grayscale images
-Approach	Greedy nearest-neighbor chaining	Simple, deterministic, no ML training required
-Time Complexity	O(N²)	Due to full pairwise distance computation
-Optimization	Frame resizing via --max-side	Balances accuracy and speed
-Robustness	Works well for visually coherent frames (low motion noise)	May need feature-based matching for heavy motion
+**Similarity Metric**:-	Manhattan Distance (Sum of Absolute Differences)	Efficient and robust for grayscale images.
+
+**Approach**:-	Greedy nearest-neighbor chaining	Simple, deterministic, no ML training required.
+
+**Time Complexity** :-	O(N²)	Due to full pairwise distance computation.
+
+**Optimization**:-	Frame resizing via --max-side	Balances accuracy and speed.
+
+**Robustness**:-	Works well for visually coherent frames (low motion noise)	May need feature-based matching for heavy motion.
 
 ## Testing and Evaluation
 
