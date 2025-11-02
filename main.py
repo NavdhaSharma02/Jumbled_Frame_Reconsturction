@@ -1,77 +1,93 @@
-# Comparing pixels of two images and highlighting differences
+import argparse
+import shutil
+from pathlib import Path
+import numpy as np
+from PIL import Image
+from scipy.spatial.distance import cdist
 
-import cv2, os, numpy as np
-from skimage.metrics import structural_similarity as ssim
-import time
-start_time = time.time()
 
-# FRAME EXTRACTION
+def preprocess_frame(path: Path, max_side: int) -> np.ndarray:
+    """Preprocess frame: grayscale + resize + flatten."""
+    with Image.open(path) as img:
+        img = img.convert("L")
+        if max_side:
+            scale = max_side / max(img.size)
+            if scale < 1.0:
+                new_size = tuple(max(1, int(round(dim * scale))) for dim in img.size)
+                img = img.resize(new_size, Image.BILINEAR)
+        return np.asarray(img, dtype=np.float32).ravel()
 
-def extract_frames(video_path, output_folder="frames", resize_to=None):
-    os.makedirs(output_folder, exist_ok=True)
 
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise ValueError(f" Cannot open video file: {video_path}")
+def sort_frames(frames: list[Path], max_side: int) -> list[int]:
+    ##Sorting frames by building a "chain" based on pairwise pixel distance (Sum of Absolute Differences).
+    print("Preprocessing frames...")
+    data = np.stack([preprocess_frame(path, max_side) for path in frames])
+    num_frames = len(frames)
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    print(f"FPS: {fps:.2f}, Total Frames: {total}")
+    print("Calculating N-by-N pairwise distance matrix...")
+    dist_matrix = cdist(data, data, 'cityblock')
 
-    count = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
+    # Finding the two frames that are the most different( likely start and end points)
+    i, j = np.unravel_index(np.argmax(dist_matrix), dist_matrix.shape)
+    start_index = i
+    print(f"Building chain, starting from frame {start_index} ({frames[start_index].name})...")
+
+    sorted_indices = [start_index]
+    used = {start_index}
+    current_index = start_index
+
+    while len(used) < num_frames:
+        best_dist = np.inf
+        best_neighbor = -1
+        for neighbor in range(num_frames):
+            if neighbor not in used:
+                dist = dist_matrix[current_index, neighbor]
+                if dist < best_dist:
+                    best_dist = dist
+                    best_neighbor = neighbor
+
+        if best_neighbor != -1:
+            current_index = best_neighbor
+            sorted_indices.append(current_index)
+            used.add(current_index)
+        else:
+            print("Error: Could not find next frame in chain.")
             break
+            
+    print("Reversing frame order to ensure correct sequence direction...")
+    sorted_indices.reverse()
 
-        if resize_to is not None:
-            frame = cv2.resize(frame, resize_to)
+    return sorted_indices
 
-        frame_path = os.path.join(output_folder, f"frame_{count:04d}.jpg")
-        cv2.imwrite(frame_path, frame)
-        count += 1
 
-    cap.release()
-    print(f"Extracted {count} frames to '{output_folder}'")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Sort jumbled frames using pairwise pixel distance.")
+    parser.add_argument("--input-dir", default="output_frames", help="Directory containing the source frames.")
+    parser.add_argument("--glob", default="frame*.png", help="Glob pattern for frame files.")
+    parser.add_argument("--output-dir", default="sorted_frames", help="Directory to place sorted frames.")
+    parser.add_argument("--max-side", type=int, default=192, help="Resize longest side to this many pixels before distance computation.")
+    args = parser.parse_args()
+
+    input_dir = Path(args.input_dir)
+    frames = sorted(input_dir.glob(args.glob))
+    if not frames:
+        raise SystemExit(f"No frames matched {args.glob} under {input_dir}")
+
+    order = sort_frames(frames, args.max_side)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    mapping_lines = []
+    for idx, frame_idx in enumerate(order, start=1):
+        src = frames[frame_idx]
+        dst_name = f"frame_{idx:05d}{src.suffix}"
+        dst = output_dir / dst_name
+        shutil.copy2(src, dst)
+        mapping_lines.append(f"{dst_name}\t{src.name}")
+
+    (output_dir / "order.tsv").write_text("\n".join(mapping_lines) + "\n", encoding="utf-8")
+    print(f"Sorted {len(frames)} frames into {output_dir}")
+
 
 if __name__ == "__main__":
-    video_file = "jumbled_video.mp4"
-    output_dir = "frames"
-    extract_frames(video_file, output_dir)
-    
-    
-# RECONSTRUCTION BASED ON PIXEL SIMILARITY
-import cv2, os, numpy as np
-from skimage.metrics import structural_similarity as ssim
-
-cap = cv2.VideoCapture("jumbled_video.mp4")
-frames=[]; 
-while True:
-    ok,f=cap.read()
-    if not ok: break
-    frames.append(cv2.resize(f,(224,224)))
-cap.release()
-
-def frame_diff(a,b):
-    return ssim(cv2.cvtColor(a,cv2.COLOR_BGR2GRAY),
-                cv2.cvtColor(b,cv2.COLOR_BGR2GRAY))
-
-n=len(frames)
-sim=np.zeros((n,n))
-for i in range(n):
-    for j in range(n):
-        if i!=j: sim[i,j]=frame_diff(frames[i],frames[j])
-
-order=[np.argmax(sim.sum(1))]
-used=np.zeros(n,bool); used[order[0]]=True
-for _ in range(n-1):
-    nxt=np.argmax(sim[order[-1]]*(~used))
-    order.append(nxt); used[nxt]=True
-
-h,w,_=frames[0].shape
-out=cv2.VideoWriter("recon_pixel.avi",cv2.VideoWriter_fourcc(*'XVID'),30,(w,h))
-for i in order: out.write(frames[i])
-out.release()
-
-end_time = time.time()      
-print(f"\n Total execution time: {end_time - start_time:.2f} seconds")
+    main()
