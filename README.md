@@ -5,15 +5,14 @@ This project reconstructs a jumbled video back into its correct chronological or
 ## Table of Contents
 - Problem Statement
 - Overview
-- Algorithm Explanation
 - Installation
-- Usage
-- Testing
-- Example Output
-- References
+- Algorithm 
+- Execution Time log
+- Testing 
+
 
  ## Problem Statement
-We are provided with a 5-second, 1080p, 60 FPS video whose frames have been randomly jumbled.The goal is to reconstruct the original video by restoring the correct frame order asaccurately and efficiently as possible.
+We are provided with a 10-second, 1080p, 30 FPS video whose frames have been randomly jumbled.The goal is to reconstruct the original video by restoring the correct frame order asaccurately and efficiently as possible.
 
 ## Overview
 This project automatically reconstructs a jumbled video by sorting its shuffled frames into their correct order using pairwise pixel similarity.
@@ -63,9 +62,13 @@ The algorithm relies on a pixel-based similarity metric to reorder frames:
 
 **Optimization**:-	Frame resizing via --max-side	Balances accuracy and speed.
 
-**Robustness**:-	Works well for visually coherent frames (low motion noise)	May need feature-based matching for heavy motion.
+**Robustness**:-	Works well for visually coherent frames (low motion noise).	May need feature-based matching for heavy motion.
 
-## Testing and Evaluation
+## Execution TIme
+<img width="397" height="66" alt="image" src="https://github.com/user-attachments/assets/2a929f9b-3a23-484f-ab03-d9c11883d983" />
+
+
+## Testing 
 
 You can test on any short video clip:
  
@@ -75,9 +78,6 @@ Verify results by comparing:
 Original video vs. output.mp4
 Visual smoothness and logical motion continuity
 
-**Optional metrics:**
-SSIM (Structural Similarity Index) between consecutive frames
-Average frame distance reduction after sorting
 
 
 
